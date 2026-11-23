@@ -388,11 +388,21 @@ class _ReverseShaper:
         fallback = None
         fallback_tags: frozenset[str] = frozenset()
 
-        # Prefer: higher feature rank, then longer input (contextual
-        # rules with lookahead context are more specific).
-        for rule in sorted(
-            rules, key=lambda r: (-r.feature_rank, -len(r.input_glyphs))
-        ):
+        # Prefer: rules not reached only through aalt (shaping engines
+        # never apply aalt, and it duplicates other features), then
+        # higher feature rank, then longer input (contextual rules with
+        # lookahead context are more specific), then rules that need
+        # fewer non-default features.
+        def _rule_key(r: _Rule):
+            extra = r.feature_tags - _DEFAULT_FEATURES
+            return (
+                extra == {"aalt"},
+                -r.feature_rank,
+                -len(r.input_glyphs),
+                len(extra),
+            )
+
+        for rule in sorted(rules, key=_rule_key):
             parts: list[str] = []
             ok = True
             for inp in rule.input_glyphs:
@@ -418,6 +428,10 @@ class _ReverseShaper:
             chain_tags = rule.feature_tags - _DEFAULT_FEATURES
             for inp in rule.input_glyphs:
                 chain_tags |= self._resolved_tags.get(inp, frozenset())
+            # aalt only duplicates other features; drop it when a more
+            # specific tag explains the glyph.
+            if len(chain_tags) > 1:
+                chain_tags = chain_tags - {"aalt"}
 
             if len(candidate) == 1:
                 return candidate, chain_tags
