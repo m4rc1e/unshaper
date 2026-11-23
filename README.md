@@ -130,8 +130,3 @@ font = TTFont(path)
 results = unshaper(font)
 data = to_dict(path, results, extract_gpos(font, results))
 ```
-
-## Origin
-
-Extracted from the `fontdiffai` project, where it provides the input text
-for unencoded glyphs in font diff reports.
