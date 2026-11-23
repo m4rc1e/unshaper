@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "unshaper"
+version = "0.1.0"
+description = "Reverse HarfBuzz shaping: trace each glyph in a font back to the input characters and features that produce it"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fonttools[woff]>=4.50",
+    "uharfbuzz>=0.39",
+]
+
+[project.scripts]
+unshaper = "unshaper.unshape:main"
+
+[tool.setuptools.packages.find]
+include = ["unshaper*"]
