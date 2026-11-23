@@ -105,13 +105,30 @@ python unshaper/unshape.py Font.ttf -o out.json
 ### Python API
 
 ```python
-from pathlib import Path
 from fontTools.ttLib import TTFont
-from unshaper import unshape
+from unshaper import unshaper
+
+results = unshaper(TTFont("Font.ttf"))   # or unshaper("Font.ttf")
+
+r = results["f_i"]
+r.sequence        # 'fi'            input text, or None if unresolved
+r.all_sequences   # []              candidates when context gives several
+r.features        # ['liga']        non-default features needed, [] if none
+```
+
+`unshaper` takes a fontTools `TTFont` or a path and returns a dict keyed
+by glyph name. `unshape` is the same function under its older name. To
+get the same structure as the JSON output, including GPOS data:
+
+```python
+from pathlib import Path
+from unshaper import to_dict
+from unshaper.gpos import extract_gpos
 
 path = Path("Font.ttf")
-results = unshape(TTFont(path), path)
-print(results["bnBH_LA"].sequence)
+font = TTFont(path)
+results = unshaper(font)
+data = to_dict(path, results, extract_gpos(font, results))
 ```
 
 ## Origin

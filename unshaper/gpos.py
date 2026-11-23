@@ -116,7 +116,10 @@ def _extract_pair_pos_fmt2(
         return
 
     # Build class → glyphs mappings.
-    coverage_glyphs = frozenset(st.Coverage.glyphs) if st.Coverage else frozenset()
+    # Keep coverage order so the representative glyph of each class is
+    # stable from run to run (set iteration order is not).
+    coverage_list = list(st.Coverage.glyphs) if st.Coverage else []
+    coverage_glyphs = frozenset(coverage_list)
 
     class1_map: dict[int, list[str]] = defaultdict(list)
     if st.ClassDef1 and st.ClassDef1.classDefs:
@@ -127,7 +130,7 @@ def _extract_pair_pos_fmt2(
     assigned1 = set()
     for glyphs in class1_map.values():
         assigned1.update(glyphs)
-    class1_map[0].extend(g for g in coverage_glyphs if g not in assigned1)
+    class1_map[0].extend(g for g in coverage_list if g not in assigned1)
 
     class2_map: dict[int, list[str]] = defaultdict(list)
     if st.ClassDef2 and st.ClassDef2.classDefs:

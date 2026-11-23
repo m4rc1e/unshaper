@@ -101,7 +101,7 @@ class _Rule:
 class _ReverseShaper:
     """Reverse shaping engine for a single font."""
 
-    def __init__(self, font: TTFont, font_path: Path):
+    def __init__(self, font: TTFont, font_data: bytes):
         self.font = font
         self.cmap = font.getBestCmap() or {}
 
@@ -109,7 +109,7 @@ class _ReverseShaper:
         for cp, gn in self.cmap.items():
             self.cmap_reverse.setdefault(gn, cp)
 
-        self.hb_font = _make_hb_font(font_path)
+        self.hb_font = _make_hb_font(font_data)
         self.id_to_name = dict(enumerate(font.getGlyphOrder()))
         self.all_glyphs = set(font.getGlyphOrder())
 
@@ -461,10 +461,8 @@ class _ReverseShaper:
 # ---- helpers ------------------------------------------------------------
 
 
-def _make_hb_font(font_path: Path) -> hb.Font:
-    with open(font_path, "rb") as f:
-        blob = hb.Blob(f.read())
-    face = hb.Face(blob)
+def _make_hb_font(font_data: bytes) -> hb.Font:
+    face = hb.Face(hb.Blob(font_data))
     font = hb.Font(face)
     font.scale = (face.upem, face.upem)
     return font
@@ -517,9 +515,61 @@ def _collect_subst_records(obj, out: set[int]) -> None:
 # ---- public API ---------------------------------------------------------
 
 
-def unshape(font: TTFont, font_path: Path) -> dict[str, UnshapeResult]:
-    """Return {glyph_name: UnshapeResult}."""
-    return _ReverseShaper(font, font_path).run()
+def _font_bytes(font: TTFont) -> bytes:
+    """Return the binary data of a TTFont.
+
+    Uses the file the font was opened from when possible, so that the
+    HarfBuzz font sees the same bytes as fontTools. Falls back to
+    saving the font to memory.
+    """
+    reader = getattr(font, "reader", None)
+    fh = getattr(reader, "file", None)
+    if fh is not None:
+        try:
+            pos = fh.tell()
+            fh.seek(0)
+            data = fh.read()
+            fh.seek(pos)
+            if data:
+                return data
+        except (OSError, ValueError):
+            pass
+    import io
+
+    buf = io.BytesIO()
+    font.save(buf)
+    return buf.getvalue()
+
+
+def unshape(
+    font: TTFont | str | Path,
+    font_path: Path | None = None,
+) -> dict[str, UnshapeResult]:
+    """Reverse-shape a font.
+
+    ``font`` is a fontTools ``TTFont`` or a path to a font file.
+    ``font_path`` is optional and only needed when the ``TTFont`` was
+    built in memory and you want HarfBuzz to read the original file.
+
+    Returns ``{glyph_name: UnshapeResult}`` for every glyph in the font.
+
+    >>> from fontTools.ttLib import TTFont
+    >>> results = unshape(TTFont("Font.ttf"))
+    >>> results["f_i"].sequence
+    'fi'
+    """
+    if isinstance(font, (str, Path)):
+        font_path = Path(font)
+        font = TTFont(font_path)
+    if font_path is not None:
+        data = Path(font_path).read_bytes()
+    else:
+        data = _font_bytes(font)
+    return _ReverseShaper(font, data).run()
+
+
+# Alias so ``from unshaper import unshaper`` reads naturally.
+unshaper = unshape
 
 
 # ---- CLI ----------------------------------------------------------------
